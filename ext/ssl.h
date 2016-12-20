@@ -80,6 +80,17 @@ class SslBox_t
 
 		void Shutdown();
 
+		// -- bicdroid --
+		bool isDefaultHostName(const char*);
+		bool switchCtxToHostName(const char*);
+		void initAltCerts(
+			bool is_server, 
+			std::map<std::string, std::pair<std::string, std::string> >& hostname2certmap, 
+			const string &cipherlist, 
+			const string &ecdh_curve, 
+			const string &dhparam, 
+			int ssl_version);
+
 	protected:
 		SslContext_t *Context;
 
@@ -92,6 +103,10 @@ class SslBox_t
 		BIO *pbioWrite;
 
 		PageList OutboundQ;
+
+		// -- bicdroid --
+		std::string default_snihostname;
+		std::map<std::string, SslContext_t*> host2contextmap;
 };
 
 extern "C" int ssl_verify_wrapper(int, X509_STORE_CTX*);

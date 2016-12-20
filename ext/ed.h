@@ -71,6 +71,9 @@ class EventableDescriptor: public Bindable_t
 		virtual void StartTls() {}
 		virtual void SetTlsParms (const char *, const char *, bool, bool, const char *, const char *, const char *, const char *, int) {}
 
+		// -- bicdroid --
+		virtual void SetAltCerts(const char*, const char*, const char*) {}
+
 		#ifdef WITH_SSL
 		virtual X509 *GetPeerCert() {return NULL;}
 		virtual int GetCipherBits() {return -1;}
@@ -207,6 +210,9 @@ class ConnectionDescriptor: public EventableDescriptor
 		virtual void StartTls();
 		virtual void SetTlsParms (const char *, const char *, bool, bool, const char *, const char *, const char *, const char *, int);
 
+		// -- bicdroid --
+		virtual void SetAltCerts(const char*, const char*, const char*);
+		
 		#ifdef WITH_SSL
 		virtual X509 *GetPeerCert();
 		virtual int GetCipherBits();
@@ -262,6 +268,9 @@ class ConnectionDescriptor: public EventableDescriptor
 		bool bSslFailIfNoPeerCert;
 		std::string SniHostName;
 		bool bSslPeerAccepted;
+
+		// -- bicdroid --
+		std::map<std::string, std::pair<std::string,std::string> > AltCertsMap;
 		#endif
 
 		#ifdef HAVE_KQUEUE

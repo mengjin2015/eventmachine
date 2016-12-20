@@ -424,6 +424,7 @@ module EventMachine
       ecdh_curve   = args[:ecdh_curve]
       dhparam      = args[:dhparam]
       fail_if_no_peer_cert = args[:fail_if_no_peer_cert]
+      alt_certs    = args[:alt_certs]
 
       [priv_key, cert_chain].each do |file|
         next if file.nil? or file.empty?
@@ -456,6 +457,7 @@ module EventMachine
       end
 
       EventMachine::set_tls_parms(@signature, priv_key || '', cert_chain || '', verify_peer, fail_if_no_peer_cert, sni_hostname || '', cipher_list || '', ecdh_curve || '', dhparam || '', protocols_bitmask)
+      EventMachine::set_alt_certs(@signature, alt_certs)
       EventMachine::start_tls @signature
     end
 

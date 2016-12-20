@@ -1195,6 +1195,20 @@ void ConnectionDescriptor::StartTls()
 		throw std::runtime_error ("SSL/TLS already running on connection");
 
 	SslBox = new SslBox_t (bIsServer, PrivateKeyFilename, CertChainFilename, bSslVerifyPeer, bSslFailIfNoPeerCert, SniHostName, CipherList, EcdhCurve, DhParam, Protocols, GetBinding());
+	
+	// -- bicdroid --
+	if (bIsServer)
+	{
+		SslBox->initAltCerts(
+			bIsServer,
+			AltCertsMap,
+			CipherList,
+			EcdhCurve, 
+			DhParam, 
+			Protocols
+			);
+	}
+	
 	_DispatchCiphertext();
 
 }
@@ -1240,6 +1254,24 @@ void ConnectionDescriptor::SetTlsParms (const char *privkey_filename UNUSED, con
 }
 #endif
 
+/*********************************
+ConnectionDescriptor::SetAltCerts -- bicdroid
+*********************************/
+
+#ifdef WITH_SSL
+void ConnectionDescriptor::SetAltCerts (const char *sni_hostname, const char *privkey_filename, const char *certchain_filename)
+{
+	if (SslBox)
+		throw std::runtime_error ("call SetAltCerts before calling StartTls");
+
+	AltCertsMap[std::string(sni_hostname)] = std::pair<std::string,std::string>(std::string(privkey_filename),std::string(certchain_filename));
+}
+#else
+void ConnectionDescriptor::SetAltCerts (const char *sni_hostname, const char *privkey_filename, const char *certchain_filename)
+{
+	throw std::runtime_error ("Encryption not available on this event-machine");
+}
+#endif
 
 /*********************************
 ConnectionDescriptor::GetPeerCert

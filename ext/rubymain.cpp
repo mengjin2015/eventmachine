@@ -353,6 +353,46 @@ static VALUE t_set_tls_parms (VALUE self UNUSED, VALUE signature, VALUE privkeyf
 }
 
 /***************
+t_set_alt_certs -- bicdroid
+***************/
+
+static int certs_hash_traveser(VALUE sni_hostname, VALUE keycertsarr, VALUE signature)
+{
+	if(RB_TYPE_P(sni_hostname, T_STRING) 
+		&& RB_TYPE_P(keycertsarr, T_ARRAY) 
+		&& RARRAY_LEN(keycertsarr)==2)
+	{
+		VALUE privkeyfilename, certchainfilename;
+		privkeyfilename   = rb_ary_entry(keycertsarr, 0);
+		certchainfilename = rb_ary_entry(keycertsarr, 1);
+
+		if (RB_TYPE_P(privkeyfilename, T_STRING) && RB_TYPE_P(certchainfilename, T_STRING))
+		{
+			evma_set_alt_certs(
+				NUM2BSIG (signature),
+				StringValueCStr (sni_hostname),
+				StringValueCStr (privkeyfilename),
+				StringValueCStr (certchainfilename)
+				);
+		}
+	}
+
+	return ST_CONTINUE;
+}
+
+static VALUE t_set_alt_certs (VALUE self UNUSED, VALUE signature, VALUE certshash)
+{
+	/* set_alt_certs takes a hash between sni_hostname and an array [privkeyfilename, certchainfilename]
+	 * This function is to support tls sni ext for multiple certs
+	 */
+	if (RB_TYPE_P(certshash, T_HASH))
+	{
+		rb_hash_foreach(certshash, (int(*)(...))certs_hash_traveser, signature);
+	}
+	return Qnil;
+}
+
+/***************
 t_get_peer_cert
 ***************/
 
@@ -1395,6 +1435,9 @@ extern "C" void Init_rubyeventmachine()
 	rb_define_module_function (EmModule, "stop_tcp_server", (VALUE(*)(...))t_stop_server, 1);
 	rb_define_module_function (EmModule, "start_unix_server", (VALUE(*)(...))t_start_unix_server, 1);
 	rb_define_module_function (EmModule, "attach_sd", (VALUE(*)(...))t_attach_sd, 1);
+	// -- bicdroid --
+	rb_define_module_function (EmModule, "set_alt_certs", (VALUE(*)(...))t_set_alt_certs, 2);
+
 	rb_define_module_function (EmModule, "set_tls_parms", (VALUE(*)(...))t_set_tls_parms, 10);
 	rb_define_module_function (EmModule, "start_tls", (VALUE(*)(...))t_start_tls, 1);
 	rb_define_module_function (EmModule, "get_peer_cert", (VALUE(*)(...))t_get_peer_cert, 1);

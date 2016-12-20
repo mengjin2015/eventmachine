@@ -298,7 +298,91 @@ SslContext_t::~SslContext_t()
 		X509_free (Certificate);
 }
 
+// -- bicdroid --
+static int ssl_servername_cb(SSL *s, int *ad, void *arg)
+{
+	SslBox_t* pBox = (SslBox_t*)arg;
 
+	if (s == NULL || pBox == NULL)
+	{
+		return SSL_TLSEXT_ERR_NOACK;
+	}
+
+	const char *servername = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
+
+#ifdef BICDEBUG
+	printf("client sni hostname: %s\n", servername);
+#endif
+
+	if (servername)
+	{
+		if (!pBox->isDefaultHostName(servername) && !pBox->switchCtxToHostName(servername))
+		{
+			return SSL_TLSEXT_ERR_NOACK;		
+		}
+	}
+
+	return SSL_TLSEXT_ERR_OK;
+}
+
+bool SslBox_t::isDefaultHostName(const char* servername)
+{
+	return strcasecmp(servername, default_snihostname.c_str())==0;
+}
+
+bool SslBox_t::switchCtxToHostName(const char* servername)
+{
+	bool success = false;
+	std::string servernamestr = std::string(servername);
+	SslContext_t *ctx = NULL;
+	SSL_CTX *v=NULL;
+	if (host2contextmap.find(servernamestr) != host2contextmap.end())
+	{
+		ctx = host2contextmap[servernamestr];
+		v = SSL_set_SSL_CTX(pSSL, ctx->pCtx);
+		success = (v==ctx->pCtx);
+	}
+
+	return success;
+}
+
+void SslBox_t::initAltCerts(
+	bool is_server, 
+	std::map<std::string, std::pair<std::string, std::string> >& hostname2certmap, 
+	const string &cipherlist, 
+	const string &ecdh_curve, 
+	const string &dhparam, 
+	int ssl_version)
+{
+	for(std::map<std::string, std::pair<std::string, std::string> >::iterator it=hostname2certmap.begin(); 
+		it!=hostname2certmap.end(); 
+		++it)
+	{
+		SslContext_t* ctx = 
+			new SslContext_t (
+				bIsServer, 
+				it->second.first,
+				it->second.second,
+				cipherlist,
+				ecdh_curve,
+				dhparam,
+				ssl_version
+				);
+		SSL_CTX_set_tlsext_servername_callback(ctx->pCtx, ssl_servername_cb);
+		SSL_CTX_set_tlsext_servername_arg(ctx->pCtx, this);
+	
+		assert(ctx);
+		host2contextmap[it->first] = ctx;
+
+#ifdef BICDEBUG
+	printf("sni hostname: %s, priv_key: %s, pub_key: %s\n", 
+		it->first.c_str(),
+		it->second.first.c_str(),
+		it->second.second.c_str());
+#endif
+
+	}		
+}
 
 /******************
 SslBox_t::SslBox_t
@@ -329,7 +413,7 @@ SslBox_t::SslBox_t (bool is_server, const string &privkeyfile, const string &cer
 	pSSL = SSL_new (Context->pCtx);
 	assert (pSSL);
 
-	if (snihostname.length() > 0) {
+	if (snihostname.length() > 0 && !bIsServer) {
 		SSL_set_tlsext_host_name (pSSL, snihostname.c_str());
 	}
 
@@ -337,6 +421,15 @@ SslBox_t::SslBox_t (bool is_server, const string &privkeyfile, const string &cer
 
 	// Store a pointer to the binding signature in the SSL object so we can retrieve it later
 	SSL_set_ex_data(pSSL, 0, (void*) binding);
+
+	// -- bicdroid --
+	SSL_CTX_set_tlsext_servername_callback(Context->pCtx, ssl_servername_cb);
+	SSL_CTX_set_tlsext_servername_arg(Context->pCtx, this);
+	default_snihostname = snihostname;
+
+#ifdef BICDEBUG
+	printf("default sni hostname: %s\n", default_snihostname.c_str());
+#endif
 
 	if (bVerifyPeer) {
 		int mode = SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE;
@@ -367,6 +460,15 @@ SslBox_t::~SslBox_t()
 	}
 
 	delete Context;
+
+	// -- bicdroid --
+	for(std::map<std::string, SslContext_t* >::iterator it=host2contextmap.begin(); 
+		it!=host2contextmap.end(); 
+		++it)
+	{
+		if (it->second) delete it->second;
+		host2contextmap[it->first] = NULL;
+	}
 }
 
 
